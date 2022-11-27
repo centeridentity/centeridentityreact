@@ -1,0 +1,41 @@
+{
+  "name": "centeridentityreact",
+  "version": "1.1.4",
+  "description": "",
+  "main": "dist/cjs/index.js",
+  "module": "dist/esm/index.js",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "rollup": "rollup -c --bundleConfigAsCjs"
+  },
+  "types": "dist/index.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/centeridentity/centeridentityreact.git"
+  },
+  "author": "Matthew Vogel, CEO, Reynold Vogel, Inc.",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/centeridentity/centeridentityreact/issues"
+  },
+  "homepage": "https://github.com/centeridentity/centeridentityreact#readme",
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^23.0.2",
+    "@rollup/plugin-node-resolve": "^15.0.1",
+    "@rollup/plugin-typescript": "^9.0.2",
+    "@types/react": "^18.0.25",
+    "react": "^18.2.0",
+    "rollup": "^3.3.0",
+    "rollup-plugin-dts": "^5.0.0",
+    "typescript": "^4.9.3"
+  },
+  "dependencies": {
+    "@react-google-maps/api": "^2.17.0",
+    "centeridentity": "^1.2.2",
+    "react-google-places-autocomplete": "^3.4.0"
+  },
+  "type": "module"
+}
