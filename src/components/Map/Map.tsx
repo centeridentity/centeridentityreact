@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react'
-import { GoogleMap, GoogleMapProps, useJsApiLoader, useGoogleMap, Marker } from '@react-google-maps/api';
+import { GoogleMap, GoogleMapProps, useJsApiLoader, useGoogleMap, Marker, Polygon } from '@react-google-maps/api';
 import { geocodeByAddress, getLatLng } from 'react-google-places-autocomplete';
 
 const containerStyle = {
@@ -7,7 +7,10 @@ const containerStyle = {
   height: '400px'
 };
 
+declare var window: any;
+
 const Map = (props: any) => {
+  const precision = props.precision || 4
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script',
     googleMapsApiKey: props.googleApi
@@ -30,8 +33,8 @@ const Map = (props: any) => {
   const triggerInvokedFromParent = () => {
     console.log('TriggerInvokedFromParent');
     geocodeByAddress(props.place.label)
-    .then(results => getLatLng(results[0]))
-    .then(({ lat, lng }) => {
+    .then((results: any) => getLatLng(results[0]))
+    .then(({ lat, lng }: {lat: any, lng: any}) => {
       map && map.panTo({ lat, lng })
     });
   };
@@ -40,6 +43,38 @@ const Map = (props: any) => {
     triggerInvokedFromParent();
   }, [props.place]);
 
+  let paths: any[] = []
+
+  if(props.selectedLocation.lat && props.selectedLocation.lng) {
+    paths.push({
+      lat: parseFloat(props.selectedLocation.lat.toFixed(precision)) + 0.00005,
+      lng: parseFloat(props.selectedLocation.lng.toFixed(precision)) - 0.00005
+    })
+    paths.push({
+      lat: parseFloat(props.selectedLocation.lat.toFixed(precision)) - 0.00005,
+      lng: parseFloat(props.selectedLocation.lng.toFixed(precision)) - 0.00005
+    })
+    paths.push({
+      lat: parseFloat(props.selectedLocation.lat.toFixed(precision)) - 0.00005,
+      lng: parseFloat(props.selectedLocation.lng.toFixed(precision)) + 0.00005
+    })
+    paths.push({
+      lat: parseFloat(props.selectedLocation.lat.toFixed(precision)) + 0.00005,
+      lng: parseFloat(props.selectedLocation.lng.toFixed(precision)) + 0.00005
+    })
+  }
+  const options = {
+    fillColor: "lightblue",
+    fillOpacity: 0.5,
+    strokeColor: "lightblue",
+    strokeOpacity: 1,
+    strokeWeight: 2,
+    clickable: false,
+    draggable: false,
+    editable: false,
+    geodesic: false,
+    zIndex: 10
+  }
   return (
       <GoogleMap
         mapContainerStyle={containerStyle}
@@ -50,8 +85,15 @@ const Map = (props: any) => {
         mapTypeId='satellite'
       >
         {props.selectedLocation.lat && props.selectedLocation.lng && <Marker
-          position={props.selectedLocation}
+          position={{
+            lat: parseFloat(props.selectedLocation.lat.toFixed(precision)),
+            lng: parseFloat(props.selectedLocation.lng.toFixed(precision))
+          }}
         ></Marker>}
+        {props.selectedLocation.lat && props.selectedLocation.lng && <Polygon
+          paths={paths}
+          options={options}
+        />}
       </GoogleMap>
   )
 }
