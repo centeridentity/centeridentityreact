@@ -16,7 +16,7 @@ const containerStyle = {
 
 declare var window: any;
 
-function drawGridBasedOnPrecision(map: any, precision: any) {
+function drawGrid(map: any, precision: any) {
   const bounds = map.getBounds();
   const ne = bounds.getNorthEast(); // Top right (northeast) corner
   const sw = bounds.getSouthWest(); // Bottom left (southwest) corner
@@ -58,18 +58,59 @@ const Map = (props: any) => {
     googleMapsApiKey: props.googleApi,
   });
   const [map, setMap]: [map: any, setMap: any] = React.useState(null);
+  const [overlay, setOverlay]: any = React.useState(null);
+  const overlayRef: any = React.useRef(null);
 
-  const onLoad = React.useCallback(function callback(map: any) {
-    map.setCenter(props.center);
-    map.setZoom(props.zoom);
-    setMap(map);
-    map.addListener("click", (e: any) => {
-      let newZoom = map.getZoom() + 5;
-      if (newZoom > 20)
-        props.setSelectedLocation({ lat: e.latLng.lat(), lng: e.latLng.lng() }); // Ensure we do not exceed zoom level 20
-      map.setZoom(newZoom);
-    });
-  }, []);
+  const onLoad = React.useCallback(
+    function callback(map: any) {
+      map.setCenter(props.center);
+      map.setZoom(props.zoom);
+      setMap(map);
+      map.addListener("click", (e: any) => {
+        map.panTo({ lat: e.latLng.lat(), lng: e.latLng.lng() });
+        map.setCenter({ lat: e.latLng.lat(), lng: e.latLng.lng() });
+        let newZoom;
+        if (map.getZoom() < 7) {
+          var panes: any = overlayRef.current.getPanes();
+          panes.overlayLayer.innerHTML = "";
+          newZoom = map.getZoom() + 3;
+        }
+        if (map.getZoom() > 7) {
+          var panes: any = overlayRef.current.getPanes();
+          panes.overlayLayer.innerHTML = "";
+          newZoom = map.getZoom() + 2;
+        }
+        if (newZoom > 20) {
+          props.setSelectedLocation({
+            lat: e.latLng.lat(),
+            lng: e.latLng.lng(),
+          }); // Ensure we do not exceed zoom level 20
+          if (props.overlay && overlayRef.current) {
+            var panes: any = overlayRef.current.getPanes();
+            var layer = document.createElement("div");
+            layer.innerHTML = `<div class="throbbing-icon-success"><h1>Done! Click next to continue.</h1></div>`;
+            panes.overlayLayer.innerHTML = "";
+            panes.overlayLayer.appendChild(layer);
+          }
+        }
+        map.setZoom(newZoom);
+      });
+      if (props.overlay) {
+        const customOverlay = new google.maps.OverlayView();
+        customOverlay.onAdd = function () {
+          var layer = document.createElement("div");
+          layer.innerHTML = `<div class="throbbing-icon"><h1>Zoom into your secret location</h1></div>`;
+          var panes: any = this.getPanes();
+          panes.overlayLayer.innerHTML = "";
+          panes.overlayLayer.appendChild(layer);
+        };
+        customOverlay.draw = function () {};
+        customOverlay.setMap(map);
+        overlayRef.current = customOverlay; // Store the overlay in the ref
+      }
+    },
+    [props.overlay /* any other dependencies */]
+  );
 
   const onUnmount = React.useCallback(function callback(map: any) {
     setMap(null);
@@ -91,6 +132,7 @@ const Map = (props: any) => {
     const zoomLevel = map.getZoom();
     const zoomThreshold = 15; // Example threshold, adjust based on needs
 
+    map.setMapTypeId(props.mapTypeId);
     setShowGrid(zoomLevel >= zoomThreshold);
   };
 
@@ -98,6 +140,13 @@ const Map = (props: any) => {
     if (map) {
       // Attach zoom change listener
       const listener = map.addListener("zoom_changed", drawGridIfZoomedIn);
+      map.addListener("idle", () => {
+        if (map.getZoom() > 20 && overlayRef.current) return;
+        if (map.getZoom() > 3 && map.getZoom() < 20 && overlayRef.current) {
+          var panes: any = overlayRef.current.getPanes();
+          if (panes) panes.overlayLayer.innerHTML = "";
+        }
+      });
       return () => google.maps.event.removeListener(listener);
     }
   }, [map]);
@@ -156,8 +205,6 @@ const Map = (props: any) => {
       zoom={props.zoom || 2}
       onLoad={onLoad}
       onUnmount={onUnmount}
-      mapTypeId="hybrid"
-      options={{ gestureHandling: "greedy" }}
       {...props}
     >
       {props.selectedLocation.lat && props.selectedLocation.lng && (
