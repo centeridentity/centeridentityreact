@@ -61,9 +61,7 @@ export interface MapProps {
   place: {
     label: string;
   };
-  setSelectedLocation: React.Dispatch<
-    React.SetStateAction<{ lat: number; lng: number }>
-  >;
+  setSelectedLocation: (location: { lat: number; lng: number }) => void;
   center: {
     lat: number;
     lng: number;
@@ -98,7 +96,7 @@ const Map = (props: MapProps) => {
   const [center, setCenter] = useState(centerProp);
   const [map, setMap]: [map: any, setMap: any] = React.useState(null);
   const [overlay, setOverlay]: any = React.useState(null);
-  const overlayRef: any = React.useRef(null);
+  // const overlayRef: any = React.useRef(null);
   const [showGrid, setShowGrid]: any = useState(false);
   const [gridSquares, setGridSquares]: any = useState([]);
   const [hoverIndex, setHoverIndex] = useState(-1); // State to track hovered polygon
@@ -113,12 +111,12 @@ const Map = (props: MapProps) => {
     map.setCenter({ lat: lat, lng: lng });
     let newZoom;
     if (map.getZoom() < 7) {
-      var panes: any = overlayRef.current.getPanes();
+      // var panes: any = overlayRef.current.getPanes();
       //panes.overlayLayer.innerHTML = "";
       newZoom = map.getZoom() + 3;
     }
     if (map.getZoom() > 7) {
-      var panes: any = overlayRef.current.getPanes();
+      // var panes: any = overlayRef.current.getPanes();
       //panes.overlayLayer.innerHTML = "";
       newZoom = map.getZoom() + 2;
     }
@@ -139,19 +137,19 @@ const Map = (props: MapProps) => {
       map.setCenter(center);
       map.setZoom(zoom);
 
-      if (overlay) {
-        const customOverlay = new google.maps.OverlayView();
-        customOverlay.onAdd = function () {
-          // var layer = document.createElement("div");
-          //layer.innerHTML = `<div class="throbbing-icon"><h1>Zoom into your secret location</h1></div>`;
-          //var panes: any = this.getPanes();
-          //panes.overlayLayer.innerHTML = "";
-          //panes.overlayLayer.appendChild(layer);
-        };
-        customOverlay.draw = function () {};
-        customOverlay.setMap(map);
-        overlayRef.current = customOverlay; // Store the overlay in the ref
-      }
+      // if (overlay) {
+      // const customOverlay = new google.maps.OverlayView();
+      // customOverlay.onAdd = function () {
+      // var layer = document.createElement("div");
+      //layer.innerHTML = `<div class="throbbing-icon"><h1>Zoom into your secret location</h1></div>`;
+      //var panes: any = this.getPanes();
+      //panes.overlayLayer.innerHTML = "";
+      //panes.overlayLayer.appendChild(layer);
+      // };
+      // customOverlay.draw = function () {};
+      // customOverlay.setMap(map);
+      // overlayRef.current = customOverlay; // Store the overlay in the ref
+      // }
     },
     [overlay /* any other dependencies */]
   );
@@ -181,12 +179,12 @@ const Map = (props: MapProps) => {
     map.setCenter({ lat: e.latLng.lat(), lng: e.latLng.lng() });
     let newZoom;
     if (map.getZoom() < 7) {
-      var panes: any = overlayRef.current.getPanes();
+      // var panes: any = overlayRef.current.getPanes();
       //panes.overlayLayer.innerHTML = "";
       newZoom = map.getZoom() + 3;
     }
     if (map.getZoom() > 7) {
-      var panes: any = overlayRef.current.getPanes();
+      // var panes: any = overlayRef.current.getPanes();
       //panes.overlayLayer.innerHTML = "";
       newZoom = map.getZoom() + 2;
     }
@@ -195,13 +193,13 @@ const Map = (props: MapProps) => {
         lat: e.latLng.lat(),
         lng: e.latLng.lng(),
       }); // Ensure we do not exceed zoom level 20
-      if (overlay && overlayRef.current) {
-        //var panes: any = overlayRef.current.getPanes();
-        //var layer = document.createElement("div");
-        //layer.innerHTML = `<div class="throbbing-icon-success"><h1>Done! Click next to continue.</h1></div>`;
-        //panes.overlayLayer.innerHTML = "";
-        //panes.overlayLayer.appendChild(layer);
-      }
+      // if (overlay && overlayRef.current) {
+      //var panes: any = overlayRef.current.getPanes();
+      //var layer = document.createElement("div");
+      //layer.innerHTML = `<div class="throbbing-icon-success"><h1>Done! Click next to continue.</h1></div>`;
+      //panes.overlayLayer.innerHTML = "";
+      //panes.overlayLayer.appendChild(layer);
+      // }
     }
     map.setZoom(newZoom);
   };
@@ -220,7 +218,6 @@ const Map = (props: MapProps) => {
   }, []);
 
   const triggerInvokedFromParent = () => {
-    console.log("TriggerInvokedFromParent");
     geocodeByAddress(place.label)
       .then((results: any) => getLatLng(results[0]))
       .then(({ lat, lng }: { lat: any; lng: any }) => {
@@ -243,11 +240,11 @@ const Map = (props: MapProps) => {
       // Attach zoom change listener
       const listener = map.addListener("zoom_changed", drawGridIfZoomedIn);
       map.addListener("idle", () => {
-        if (map.getZoom() > 20 && overlayRef.current) return;
-        if (map.getZoom() > 3 && map.getZoom() < 20 && overlayRef.current) {
-          var panes: any = overlayRef.current.getPanes();
-          //if (panes) panes.overlayLayer.innerHTML = "";
-        }
+        // if (map.getZoom() > 20 && overlayRef.current) return;
+        // if (map.getZoom() > 3 && map.getZoom() < 20 && overlayRef.current) {
+        //   var panes: any = overlayRef.current.getPanes();
+        //   if (panes) panes.overlayLayer.innerHTML = "";
+        // }
       });
       return () => google.maps.event.removeListener(listener);
     }

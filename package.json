@@ -1,6 +1,6 @@
 {
   "name": "centeridentityreact",
-  "version": "1.6.18",
+  "version": "1.7.2",
   "description": "",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
@@ -38,6 +38,7 @@
     "@storybook/react": "^8.0.9",
     "@storybook/react-webpack5": "^8.0.9",
     "@storybook/test": "^8.0.9",
+    "@types/google.maps": "^3.55.7",
     "@types/react": "^18.0.25",
     "react": "^18.2.0",
     "rollup": "^3.3.0",
