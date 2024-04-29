@@ -1,6 +1,6 @@
 {
   "name": "centeridentityreact",
-  "version": "1.5.20",
+  "version": "1.6.18",
   "description": "",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
@@ -9,7 +9,9 @@
   ],
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "rollup": "rollup -c --bundleConfigAsCjs"
+    "rollup": "rollup -c --bundleConfigAsCjs",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build"
   },
   "types": "dist/index.d.ts",
   "repository": {
@@ -23,13 +25,24 @@
   },
   "homepage": "https://github.com/centeridentity/centeridentityreact#readme",
   "devDependencies": {
+    "@chromatic-com/storybook": "^1.3.3",
     "@rollup/plugin-commonjs": "^23.0.2",
     "@rollup/plugin-node-resolve": "^15.0.1",
     "@rollup/plugin-typescript": "^9.0.2",
+    "@storybook/addon-essentials": "^8.0.9",
+    "@storybook/addon-interactions": "^8.0.9",
+    "@storybook/addon-links": "^8.0.9",
+    "@storybook/addon-onboarding": "^8.0.9",
+    "@storybook/addon-webpack5-compiler-swc": "^1.0.2",
+    "@storybook/blocks": "^8.0.9",
+    "@storybook/react": "^8.0.9",
+    "@storybook/react-webpack5": "^8.0.9",
+    "@storybook/test": "^8.0.9",
     "@types/react": "^18.0.25",
     "react": "^18.2.0",
     "rollup": "^3.3.0",
     "rollup-plugin-dts": "^5.0.0",
+    "storybook": "^8.0.9",
     "typescript": "^4.9.3"
   },
   "dependencies": {
