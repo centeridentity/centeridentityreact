@@ -7,7 +7,12 @@ import {
   Marker,
   Polygon,
 } from "@react-google-maps/api";
-import { geocodeByAddress, getLatLng } from "react-google-places-autocomplete";
+import GooglePlacesAutocomplete, {
+  geocodeByAddress,
+  getLatLng,
+} from "react-google-places-autocomplete";
+import { Loader } from "@googlemaps/js-api-loader";
+import { logEvent } from "../../logEvent";
 
 const containerStyle = {
   width: "505px",
@@ -54,48 +59,97 @@ function drawGrid(map: any, precision: any) {
   return gridSquares;
 }
 export interface MapProps {
-  selectedLocation: {
+  selectedLocation?: {
     lat: number;
     lng: number;
   };
-  place: {
+  place?: {
     label: string;
   };
-  setSelectedLocation: (location: { lat: number; lng: number }) => void;
-  center: {
+  setSelectedLocation?: (location: { lat: number; lng: number }) => void;
+  onZoomWithGrid?: () => void;
+  onZoomWithoutGrid?: () => void;
+  onGridSquareClicked: () => void;
+  center?: {
     lat: number;
     lng: number;
   };
   // Add other properties as needed
-  drawGrid: boolean;
-  precision: number;
-  zoom: number;
-  overlay: boolean;
-  mapTypeId: string;
-  mapContainerStyle: {
+  drawGrid?: boolean;
+  precision?: number;
+  zoom?: number;
+  overlay?: boolean;
+  mapTypeId?: string;
+  mapContainerStyle?: {
     width: string;
     height: string;
   };
-  options: any;
+  options?: any;
 }
 interface Location {
   lat: number;
   lng: number;
 }
+
+const mapStyles = [
+  {
+    featureType: "all",
+    elementType: "labels",
+    stylers: [{ visibility: "on" }],
+  },
+  {
+    featureType: "administrative.country",
+    elementType: "labels",
+    stylers: [{ visibility: "on" }],
+  },
+  {
+    featureType: "administrative.province",
+    elementType: "labels",
+    stylers: [{ visibility: "on" }],
+  },
+  {
+    featureType: "administrative.locality",
+    elementType: "labels",
+    stylers: [{ visibility: "on" }],
+  },
+  {
+    featureType: "road",
+    elementType: "labels",
+    stylers: [{ visibility: "on" }],
+  },
+  {
+    featureType: "poi",
+    elementType: "labels",
+    stylers: [{ visibility: "on" }],
+  },
+];
+const optionsDefault = {
+  gestureHandling: "greedy",
+  streetViewControl: false,
+  styles: mapStyles,
+};
 const Map = (props: MapProps) => {
-  let {
-    zoom,
-    selectedLocation,
-    setSelectedLocation,
-    precision: precisionProp,
-    center: centerProp,
-    place,
-    mapTypeId,
+  const {
+    zoom = 3,
+    selectedLocation = { lat: 0, lng: 0 },
+    setSelectedLocation = () => {},
+    precision: precisionProp = 4,
+    center: centerProp = { lat: 0, lng: 0 },
+    place = { label: "Portland, Oregon" },
+    mapTypeId = "hybrid",
+    mapContainerStyle = {
+      width: "100%",
+      height: "100%",
+    },
+    options: optionsProp,
+    onZoomWithGrid = () => {},
+    onZoomWithoutGrid = () => {},
+    onGridSquareClicked = () => {},
   } = props;
+  const options = optionsProp || optionsDefault;
   const precision = precisionProp || 4;
   const [center, setCenter] = useState(centerProp);
   const [map, setMap]: [map: any, setMap: any] = React.useState(null);
-  const [overlay, setOverlay]: any = React.useState(null);
   // const overlayRef: any = React.useRef(null);
   const [showGrid, setShowGrid]: any = useState(false);
   const [gridSquares, setGridSquares]: any = useState([]);
@@ -103,6 +157,8 @@ const Map = (props: MapProps) => {
   const [selectedSquareId, setSelectedSquareId] = useState(null);
 
   const handlePolygonClick = (squareId: any, event: any) => {
+    logEvent("click", { target: "Map grid square" });
+    onGridSquareClicked();
     setSelectedSquareId(squareId); // Highlight the polygon
     const lat = event.latLng?.lat();
     const lng = event.latLng?.lng();
@@ -151,7 +207,9 @@ const Map = (props: MapProps) => {
       // overlayRef.current = customOverlay; // Store the overlay in the ref
       // }
     },
-    [overlay /* any other dependencies */]
+    [
+      /* any other dependencies */
+    ]
   );
 
   useEffect(() => {
@@ -175,6 +233,7 @@ const Map = (props: MapProps) => {
   }, [map, center, precision, showGrid]);
 
   const mapClicked = (e: any) => {
+    logEvent("click", { target: "Map" });
     map.panTo({ lat: e.latLng.lat(), lng: e.latLng.lng() });
     map.setCenter({ lat: e.latLng.lat(), lng: e.latLng.lng() });
     let newZoom;
@@ -233,6 +292,22 @@ const Map = (props: MapProps) => {
 
     map.setMapTypeId(mapTypeId);
     setShowGrid(zoomLevel >= zoomThreshold);
+    if (
+      !showGrid &&
+      zoomLevel >= zoomThreshold &&
+      onZoomWithGrid &&
+      !selectedSquareId
+    ) {
+      onZoomWithGrid();
+    }
+    if (
+      !showGrid &&
+      zoomLevel < zoomThreshold &&
+      onZoomWithoutGrid &&
+      !selectedSquareId
+    ) {
+      onZoomWithoutGrid();
+    }
   };
 
   useEffect(() => {
@@ -240,6 +315,8 @@ const Map = (props: MapProps) => {
       // Attach zoom change listener
       const listener = map.addListener("zoom_changed", drawGridIfZoomedIn);
       map.addListener("idle", () => {
+        logEvent("event", { target: "Map idle" });
+
         // if (map.getZoom() > 20 && overlayRef.current) return;
         // if (map.getZoom() > 3 && map.getZoom() < 20 && overlayRef.current) {
         //   var panes: any = overlayRef.current.getPanes();
@@ -248,14 +325,14 @@ const Map = (props: MapProps) => {
       });
       return () => google.maps.event.removeListener(listener);
     }
-  }, [map]);
+  }, [map, selectedSquareId]);
   useEffect(() => {
     // Initial check in case the map starts zoomed in
     drawGridIfZoomedIn();
   }, [map]); // Ensure this runs when the map instance becomes available
 
   useEffect(() => {
-    triggerInvokedFromParent();
+    if (isLoaded) triggerInvokedFromParent();
   }, [place]);
 
   let paths: any[] = [];
@@ -290,47 +367,56 @@ const Map = (props: MapProps) => {
   //   geodesic: false,
   //   zIndex: 100,
   // };
-
+  const [libraries] = useState([]);
+  const { isLoaded } = useJsApiLoader({
+    id: "google-map-script",
+    googleMapsApiKey: "AIzaSyDEbmqlzlkU3mErAG-PPdPEbTrv6opHmag",
+    libraries: libraries,
+  });
   return (
-    <GoogleMap onLoad={onLoad} onUnmount={onUnmount} {...props}>
-      {/* {selectedLocation.lat && selectedLocation.lng && (
-        <Marker
-          position={{
-            lat: parseFloat(selectedLocation.lat.toFixed(precision)),
-            lng: parseFloat(selectedLocation.lng.toFixed(precision)),
-          }}
-        ></Marker>
-      )} */}
-      {/* {selectedLocation.lat && selectedLocation.lng && (
-        <Polygon paths={paths} options={options} />
-      )} */}
-      {showGrid &&
-        gridSquares.map((square: any, index: any) => (
-          <Polygon
-            key={index}
-            paths={square.paths}
-            options={{
-              strokeColor:
-                selectedSquareId === square.id ? "lightblue" : "#000000",
-              strokeOpacity: 0.6,
-              strokeWeight: 1,
-              fillColor:
-                selectedSquareId === square.id ? "lightblue" : "#000000",
-              zIndex: 100,
-              clickable: true,
-              fillOpacity:
-                selectedSquareId === square.id
-                  ? 0.5
-                  : hoverIndex === index
-                    ? 0.3
-                    : 0.1,
+    <>
+      {isLoaded && (
+        <GoogleMap onLoad={onLoad} onUnmount={onUnmount} {...props}>
+          {/* {selectedLocation.lat && selectedLocation.lng && (
+          <Marker
+            position={{
+              lat: parseFloat(selectedLocation.lat.toFixed(precision)),
+              lng: parseFloat(selectedLocation.lng.toFixed(precision)),
             }}
-            onMouseOver={() => handleMouseOver(index)}
-            onMouseOut={handleMouseOut}
-            onClick={(e) => handlePolygonClick(square.id, e)}
-          />
-        ))}
-    </GoogleMap>
+          ></Marker>
+        )} */}
+          {/* {selectedLocation.lat && selectedLocation.lng && (
+          <Polygon paths={paths} options={options} />
+        )} */}
+          {showGrid &&
+            gridSquares.map((square: any, index: any) => (
+              <Polygon
+                key={index}
+                paths={square.paths}
+                options={{
+                  strokeColor:
+                    selectedSquareId === square.id ? "lightblue" : "#000000",
+                  strokeOpacity: 0.6,
+                  strokeWeight: 1,
+                  fillColor:
+                    selectedSquareId === square.id ? "lightblue" : "#000000",
+                  zIndex: 100,
+                  clickable: true,
+                  fillOpacity:
+                    selectedSquareId === square.id
+                      ? 0.5
+                      : hoverIndex === index
+                        ? 0.3
+                        : 0.1,
+                }}
+                onMouseOver={() => handleMouseOver(index)}
+                onMouseOut={handleMouseOut}
+                onClick={(e) => handlePolygonClick(square.id, e)}
+              />
+            ))}
+        </GoogleMap>
+      )}
+    </>
   );
 };
 

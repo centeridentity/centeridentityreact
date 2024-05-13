@@ -69,12 +69,27 @@ const Template: StoryFn<MapProps> = (args: MapProps) => {
     action("setSelectedLocation")(location);
   };
 
+  const handleonZoomWithGrid = () => {
+    console.log("handleonZoomWithGrid");
+  };
+
+  const handleonZoomWithoutGrid = () => {
+    console.log("handleonZoomWithoutGrid");
+  };
+
+  const handleonGridSquareClicked = () => {
+    console.log("onGridSquareClicked");
+  };
+
   return (
     <Map
       {...args}
       setSelectedLocation={handleSetSelectedLocation}
       selectedLocation={selectedLocation}
       options={options}
+      onZoomWithGrid={handleonZoomWithGrid}
+      onZoomWithoutGrid={handleonZoomWithoutGrid}
+      onGridSquareClicked={handleonGridSquareClicked}
     />
   );
 };
