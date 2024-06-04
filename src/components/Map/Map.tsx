@@ -63,28 +63,28 @@ export interface MapProps {
     lat: number;
     lng: number;
   };
-  place?: {
-    label: string;
-  };
-  setSelectedLocation?: (location: { lat: number; lng: number }) => void;
-  onZoomWithGrid?: () => void;
-  onZoomWithoutGrid?: () => void;
-  onGridSquareClicked: () => void;
+  setSelectedLocation?: (location: {
+    lat: number;
+    lng: number;
+    confirmed: boolean;
+  }) => void;
+  onZoomWithGrid?: (zoomLevel: number) => void;
+  onZoomWithoutGrid?: (zoomLevel: number) => void;
+  onGridSquareClicked?: (squareId: string) => void;
   center?: {
     lat: number;
     lng: number;
   };
-  // Add other properties as needed
-  drawGrid?: boolean;
-  precision?: number;
   zoom?: number;
-  overlay?: boolean;
-  mapTypeId?: string;
   mapContainerStyle?: {
     width: string;
     height: string;
   };
   options?: any;
+  getMap?: (map: google.maps.Map) => void;
+  setSelectedSquareId?: (squareId: string) => void;
+  selectedSquareId?: string;
+  disableDefaultUI?: boolean;
 }
 interface Location {
   lat: number;
@@ -95,7 +95,7 @@ const mapStyles = [
   {
     featureType: "all",
     elementType: "labels",
-    stylers: [{ visibility: "on" }],
+    stylers: [{ visibility: "off" }],
   },
   {
     featureType: "administrative.country",
@@ -120,65 +120,83 @@ const mapStyles = [
   {
     featureType: "poi",
     elementType: "labels",
-    stylers: [{ visibility: "on" }],
+    stylers: [{ visibility: "off" }],
   },
 ];
 const optionsDefault = {
   gestureHandling: "greedy",
   streetViewControl: false,
   styles: mapStyles,
+  disableDefaultUI: true, // Disable all default UI
+  zoomControl: false, // Disable zoom control
 };
 const Map = (props: MapProps) => {
+  const [defaultSelectedLocation, defaultSetSelectedLocation] = useState({
+    lat: 0,
+    lng: 0,
+    confirmed: false,
+  });
+  const [defaultSelectedSquareId, defaultSetSelectedSquareId] = useState("");
   const {
     zoom = 3,
-    selectedLocation = { lat: 0, lng: 0 },
-    setSelectedLocation = () => {},
-    precision: precisionProp = 4,
+    selectedLocation,
+    setSelectedLocation,
     center: centerProp = { lat: 0, lng: 0 },
-    place = { label: "Portland, Oregon" },
-    mapTypeId = "hybrid",
     mapContainerStyle = {
       width: "100%",
-      height: "100%",
+      height: "250px",
     },
     options: optionsProp,
     onZoomWithGrid = () => {},
     onZoomWithoutGrid = () => {},
-    onGridSquareClicked = () => {},
+    onGridSquareClicked = (squareId) => {},
+    getMap = (map) => {},
+    setSelectedSquareId,
+    selectedSquareId,
+    disableDefaultUI = true,
   } = props;
+  const setSelectedLocationHandler =
+    setSelectedLocation || defaultSetSelectedLocation;
+  const selectedLocationValue = selectedLocation || defaultSelectedLocation;
+  const setSelectedSquareIdHandler =
+    setSelectedSquareId || defaultSetSelectedSquareId;
+  const selectedSquareIdValue = selectedSquareId || defaultSelectedSquareId;
+  const mapTypeId = "hybrid";
   const options = optionsProp || optionsDefault;
-  const precision = precisionProp || 4;
+  const precision = 4;
   const [center, setCenter] = useState(centerProp);
-  const [map, setMap]: [map: any, setMap: any] = React.useState(null);
+  const [map, setMap]: [map: any, setMap: any] = useState(null);
   // const overlayRef: any = React.useRef(null);
   const [showGrid, setShowGrid]: any = useState(false);
   const [gridSquares, setGridSquares]: any = useState([]);
   const [hoverIndex, setHoverIndex] = useState(-1); // State to track hovered polygon
-  const [selectedSquareId, setSelectedSquareId] = useState(null);
+  const [mapZoom, setMapZoom] = useState(zoom);
 
   const handlePolygonClick = (squareId: any, event: any) => {
     logEvent("click", { target: "Map grid square" });
-    onGridSquareClicked();
-    setSelectedSquareId(squareId); // Highlight the polygon
+    onGridSquareClicked(squareId);
+    setSelectedSquareIdHandler(squareId);
     const lat = event.latLng?.lat();
     const lng = event.latLng?.lng();
 
     map.panTo({ lat: lat, lng: lng });
     map.setCenter({ lat: lat, lng: lng });
     let newZoom;
-    if (map.getZoom() < 7) {
+    let zoomLevel = map.getZoom() || mapZoom;
+    if (zoomLevel < 7) {
       // var panes: any = overlayRef.current.getPanes();
       //panes.overlayLayer.innerHTML = "";
-      newZoom = map.getZoom() + 3;
+      newZoom = zoomLevel + 3;
     }
-    if (map.getZoom() > 7) {
+    if (zoomLevel > 7) {
       // var panes: any = overlayRef.current.getPanes();
       //panes.overlayLayer.innerHTML = "";
-      newZoom = map.getZoom() + 2;
+      newZoom = zoomLevel + 2;
     }
 
-    setSelectedLocation({ lat, lng }); // Store the coordinates
+    setSelectedLocationHandler({ lat, lng, confirmed: false }); // Store the coordinates
     map.setZoom(newZoom);
+    setMapZoom(newZoom);
   };
   const handleMouseOver = (index: number) => {
     setHoverIndex(index);
@@ -190,9 +208,14 @@ const Map = (props: MapProps) => {
   const onLoad = React.useCallback(
     (map: any) => {
       setMap(map);
+      getMap(map);
       map.setCenter(center);
       map.setZoom(zoom);
-
+      setMapZoom(zoom);
+      // map.setOptions({
+      //   draggableCursor: "default",
+      //   draggingCursor: "default",
+      // });
       // if (overlay) {
       // const customOverlay = new google.maps.OverlayView();
       // customOverlay.onAdd = function () {
@@ -216,6 +239,7 @@ const Map = (props: MapProps) => {
     if (map) {
       map.setCenter(center);
       map.setZoom(zoom);
+      setMapZoom(zoom);
 
       const boundsChangedListener = map.addListener("bounds_changed", () => {
         const newCenter = map.getCenter();
@@ -237,20 +261,22 @@ const Map = (props: MapProps) => {
     map.panTo({ lat: e.latLng.lat(), lng: e.latLng.lng() });
     map.setCenter({ lat: e.latLng.lat(), lng: e.latLng.lng() });
     let newZoom;
-    if (map.getZoom() < 7) {
+    let zoomLevel = map.getZoom() || mapZoom;
+    if (zoomLevel < 7) {
       // var panes: any = overlayRef.current.getPanes();
       //panes.overlayLayer.innerHTML = "";
-      newZoom = map.getZoom() + 3;
+      newZoom = zoomLevel + 3;
     }
-    if (map.getZoom() > 7) {
+    if (zoomLevel > 7) {
       // var panes: any = overlayRef.current.getPanes();
       //panes.overlayLayer.innerHTML = "";
-      newZoom = map.getZoom() + 2;
+      newZoom = zoomLevel + 2;
     }
     if (newZoom > 20) {
-      setSelectedLocation({
+      setSelectedLocationHandler({
         lat: e.latLng.lat(),
         lng: e.latLng.lng(),
+        confirmed: false,
       }); // Ensure we do not exceed zoom level 20
       // if (overlay && overlayRef.current) {
       //var panes: any = overlayRef.current.getPanes();
@@ -261,6 +287,7 @@ const Map = (props: MapProps) => {
       // }
     }
     map.setZoom(newZoom);
+    setMapZoom(newZoom);
   };
 
   useEffect(() => {
@@ -276,14 +303,6 @@ const Map = (props: MapProps) => {
     setMap(null);
   }, []);
 
-  const triggerInvokedFromParent = () => {
-    geocodeByAddress(place.label)
-      .then((results: any) => getLatLng(results[0]))
-      .then(({ lat, lng }: { lat: any; lng: any }) => {
-        map && map.panTo({ lat, lng });
-        map && map.setZoom(7);
-      });
-  };
   // Function to draw the grid, modified to check zoom level
   const drawGridIfZoomedIn = () => {
     if (!map) return;
@@ -292,21 +311,11 @@ const Map = (props: MapProps) => {
 
     map.setMapTypeId(mapTypeId);
     setShowGrid(zoomLevel >= zoomThreshold);
-    if (
-      !showGrid &&
-      zoomLevel >= zoomThreshold &&
-      onZoomWithGrid &&
-      !selectedSquareId
-    ) {
-      onZoomWithGrid();
+    if (zoomLevel >= zoomThreshold && onZoomWithGrid) {
+      onZoomWithGrid(zoomLevel);
     }
-    if (
-      !showGrid &&
-      zoomLevel < zoomThreshold &&
-      onZoomWithoutGrid &&
-      !selectedSquareId
-    ) {
-      onZoomWithoutGrid();
+    if (zoomLevel < zoomThreshold && onZoomWithoutGrid) {
+      onZoomWithoutGrid(zoomLevel);
     }
   };
 
@@ -315,8 +324,7 @@ const Map = (props: MapProps) => {
       // Attach zoom change listener
       const listener = map.addListener("zoom_changed", drawGridIfZoomedIn);
       map.addListener("idle", () => {
-        logEvent("event", { target: "Map idle" });
-
+        //logEvent("event", { target: "Map idle" });
         // if (map.getZoom() > 20 && overlayRef.current) return;
         // if (map.getZoom() > 3 && map.getZoom() < 20 && overlayRef.current) {
         //   var panes: any = overlayRef.current.getPanes();
@@ -325,34 +333,30 @@ const Map = (props: MapProps) => {
       });
       return () => google.maps.event.removeListener(listener);
     }
-  }, [map, selectedSquareId]);
+  }, [map, showGrid]);
   useEffect(() => {
     // Initial check in case the map starts zoomed in
     drawGridIfZoomedIn();
   }, [map]); // Ensure this runs when the map instance becomes available
 
-  useEffect(() => {
-    if (isLoaded) triggerInvokedFromParent();
-  }, [place]);
-
   let paths: any[] = [];
 
-  if (selectedLocation.lat && selectedLocation.lng) {
+  if (selectedLocationValue.lat && selectedLocationValue.lng) {
     paths.push({
-      lat: parseFloat(selectedLocation.lat.toFixed(precision)) + 0.00005,
-      lng: parseFloat(selectedLocation.lng.toFixed(precision)) - 0.00005,
+      lat: parseFloat(selectedLocationValue.lat.toFixed(precision)) + 0.00005,
+      lng: parseFloat(selectedLocationValue.lng.toFixed(precision)) - 0.00005,
     });
     paths.push({
-      lat: parseFloat(selectedLocation.lat.toFixed(precision)) - 0.00005,
-      lng: parseFloat(selectedLocation.lng.toFixed(precision)) - 0.00005,
+      lat: parseFloat(selectedLocationValue.lat.toFixed(precision)) - 0.00005,
+      lng: parseFloat(selectedLocationValue.lng.toFixed(precision)) - 0.00005,
     });
     paths.push({
-      lat: parseFloat(selectedLocation.lat.toFixed(precision)) - 0.00005,
-      lng: parseFloat(selectedLocation.lng.toFixed(precision)) + 0.00005,
+      lat: parseFloat(selectedLocationValue.lat.toFixed(precision)) - 0.00005,
+      lng: parseFloat(selectedLocationValue.lng.toFixed(precision)) + 0.00005,
     });
     paths.push({
-      lat: parseFloat(selectedLocation.lat.toFixed(precision)) + 0.00005,
-      lng: parseFloat(selectedLocation.lng.toFixed(precision)) + 0.00005,
+      lat: parseFloat(selectedLocationValue.lat.toFixed(precision)) + 0.00005,
+      lng: parseFloat(selectedLocationValue.lng.toFixed(precision)) + 0.00005,
     });
   }
   // const options = {
@@ -367,16 +371,27 @@ const Map = (props: MapProps) => {
   //   geodesic: false,
   //   zIndex: 100,
   // };
-  const [libraries] = useState([]);
+  const [libraries] = useState([
+    "places",
+    "geometry",
+    "localContext",
+    "drawing",
+    "visualization",
+  ]);
   const { isLoaded } = useJsApiLoader({
     id: "google-map-script",
     googleMapsApiKey: "AIzaSyDEbmqlzlkU3mErAG-PPdPEbTrv6opHmag",
-    libraries: libraries,
+    libraries: libraries as any,
   });
   return (
     <>
       {isLoaded && (
-        <GoogleMap onLoad={onLoad} onUnmount={onUnmount} {...props}>
+        <GoogleMap
+          onLoad={onLoad}
+          onUnmount={onUnmount}
+          options={options}
+          {...props}
+        >
           {/* {selectedLocation.lat && selectedLocation.lng && (
           <Marker
             position={{
@@ -395,15 +410,19 @@ const Map = (props: MapProps) => {
                 paths={square.paths}
                 options={{
                   strokeColor:
-                    selectedSquareId === square.id ? "lightblue" : "#000000",
+                    selectedSquareIdValue === square.id
+                      ? "lightblue"
+                      : "#000000",
                   strokeOpacity: 0.6,
                   strokeWeight: 1,
                   fillColor:
-                    selectedSquareId === square.id ? "lightblue" : "#000000",
+                    selectedSquareIdValue === square.id
+                      ? "lightblue"
+                      : "#000000",
                   zIndex: 100,
                   clickable: true,
                   fillOpacity:
-                    selectedSquareId === square.id
+                    selectedSquareIdValue === square.id
                       ? 0.5
                       : hoverIndex === index
                         ? 0.3

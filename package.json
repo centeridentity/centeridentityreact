@@ -1,6 +1,6 @@
 {
   "name": "centeridentityreact",
-  "version": "1.9.0",
+  "version": "1.15.0",
   "description": "",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
@@ -47,7 +47,6 @@
     "typescript": "^4.9.3"
   },
   "dependencies": {
-    "@googlemaps/js-api-loader": "^1.16.6",
     "@react-google-maps/api": "^2.17.0",
     "@rollup/plugin-json": "^6.1.0",
     "centeridentity": "^1.2.2",
