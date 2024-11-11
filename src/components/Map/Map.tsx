@@ -364,7 +364,7 @@ const Map = (props: MapProps) => {
       map.setZoom(newZoom);
       setMapZoom(newZoom);
     },
-    [map, showGrid]
+    [map, showGrid, disabledLocations]
   );
 
   useEffect(() => {
