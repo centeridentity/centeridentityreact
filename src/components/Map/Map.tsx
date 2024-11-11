@@ -1,4 +1,4 @@
-import React, { useEffect, ReactElement, useState } from "react";
+import React, { useEffect, ReactElement, useState, useCallback } from "react";
 import {
   GoogleMap,
   GoogleMapProps,
@@ -58,6 +58,50 @@ function drawGrid(map: any, precision: any) {
   // gridSquares now contains paths for drawing the grid cells
   return gridSquares;
 }
+
+function isCoordinateInDisabledLocation(
+  coordinate: any,
+  disabledLocations: any
+) {
+  for (const disabledLocation of disabledLocations) {
+    const { lat, lng, radius } = disabledLocation;
+    const distance = google.maps.geometry.spherical.computeDistanceBetween(
+      new google.maps.LatLng(coordinate.lat, coordinate.lng),
+      new google.maps.LatLng(lat, lng)
+    );
+    if (distance <= radius) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function isSquareInDisabledLocation(square: any, disabledLocations: any) {
+  const squareCenter = getSquareCenter(square);
+  for (const disabledLocation of disabledLocations) {
+    const { lat, lng, radius } = disabledLocation;
+    const distance = google.maps.geometry.spherical.computeDistanceBetween(
+      new google.maps.LatLng(squareCenter.lat, squareCenter.lng),
+      new google.maps.LatLng(lat, lng)
+    );
+    if (distance <= radius) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function getSquareCenter(square: any) {
+  const paths = square.paths;
+  const latSum = paths.reduce((sum: any, point: any) => sum + point.lat, 0);
+  const lngSum = paths.reduce((sum: any, point: any) => sum + point.lng, 0);
+  const center = {
+    lat: latSum / paths.length,
+    lng: lngSum / paths.length,
+  };
+  return center;
+}
+
 export interface MapProps {
   selectedLocation?: {
     lat: number;
@@ -85,6 +129,16 @@ export interface MapProps {
   setSelectedSquareId?: (squareId: string) => void;
   selectedSquareId?: string;
   disableDefaultUI?: boolean;
+  setHoverIndex?: (hoverIndex: number) => void;
+  hoverIndex?: number;
+  precision?: number;
+  disabledLocations?: [
+    {
+      lat: number;
+      lng: number;
+      radius: number;
+    }?,
+  ];
 }
 interface Location {
   lat: number;
@@ -137,8 +191,10 @@ const Map = (props: MapProps) => {
     confirmed: false,
   });
   const [defaultSelectedSquareId, defaultSetSelectedSquareId] = useState("");
+  const [defaultHoverIndex, defaultSetHoverIndex] = useState(-1); // State to track hovered polygon
+  const precisionDefault = 4;
   const {
-    zoom = 3,
+    zoom = 2,
     selectedLocation,
     setSelectedLocation,
     center: centerProp = { lat: 0, lng: 0 },
@@ -154,6 +210,10 @@ const Map = (props: MapProps) => {
     setSelectedSquareId,
     selectedSquareId,
     disableDefaultUI = true,
+    setHoverIndex,
+    hoverIndex,
+    precision: precisionProp = 4,
+    disabledLocations = [],
   } = props;
   const setSelectedLocationHandler =
     setSelectedLocation || defaultSetSelectedLocation;
@@ -161,15 +221,16 @@ const Map = (props: MapProps) => {
   const setSelectedSquareIdHandler =
     setSelectedSquareId || defaultSetSelectedSquareId;
   const selectedSquareIdValue = selectedSquareId || defaultSelectedSquareId;
+  const setHoverIndexHandler = setHoverIndex || defaultSetHoverIndex;
+  const hoverIndexValue = hoverIndex || defaultHoverIndex;
   const mapTypeId = "hybrid";
   const options = optionsProp || optionsDefault;
-  const precision = 4;
+  const precision = precisionProp || precisionDefault;
   const [center, setCenter] = useState(centerProp);
   const [map, setMap]: [map: any, setMap: any] = useState(null);
   // const overlayRef: any = React.useRef(null);
   const [showGrid, setShowGrid]: any = useState(false);
   const [gridSquares, setGridSquares]: any = useState([]);
-  const [hoverIndex, setHoverIndex] = useState(-1); // State to track hovered polygon
   const [mapZoom, setMapZoom] = useState(zoom);
 
   const handlePolygonClick = (squareId: any, event: any) => {
@@ -191,7 +252,7 @@ const Map = (props: MapProps) => {
     if (zoomLevel > 7) {
       // var panes: any = overlayRef.current.getPanes();
       //panes.overlayLayer.innerHTML = "";
-      newZoom = zoomLevel + 2;
+      newZoom = zoomLevel;
     }
 
     setSelectedLocationHandler({ lat, lng, confirmed: false }); // Store the coordinates
@@ -199,11 +260,11 @@ const Map = (props: MapProps) => {
     setMapZoom(newZoom);
   };
   const handleMouseOver = (index: number) => {
-    setHoverIndex(index);
+    setHoverIndexHandler(index);
   };
 
   const handleMouseOut = () => {
-    setHoverIndex(-1);
+    setHoverIndexHandler(-1);
   };
   const onLoad = React.useCallback(
     (map: any) => {
@@ -256,45 +317,65 @@ const Map = (props: MapProps) => {
     }
   }, [map, center, precision, showGrid]);
 
-  const mapClicked = (e: any) => {
-    logEvent("click", { target: "Map" });
-    map.panTo({ lat: e.latLng.lat(), lng: e.latLng.lng() });
-    map.setCenter({ lat: e.latLng.lat(), lng: e.latLng.lng() });
-    let newZoom;
-    let zoomLevel = map.getZoom() || mapZoom;
-    if (zoomLevel < 7) {
-      // var panes: any = overlayRef.current.getPanes();
-      //panes.overlayLayer.innerHTML = "";
-      newZoom = zoomLevel + 3;
-    }
-    if (zoomLevel > 7) {
-      // var panes: any = overlayRef.current.getPanes();
-      //panes.overlayLayer.innerHTML = "";
-      newZoom = zoomLevel + 2;
-    }
-    if (newZoom > 20) {
-      setSelectedLocationHandler({
-        lat: e.latLng.lat(),
-        lng: e.latLng.lng(),
-        confirmed: false,
-      }); // Ensure we do not exceed zoom level 20
-      // if (overlay && overlayRef.current) {
-      //var panes: any = overlayRef.current.getPanes();
-      //var layer = document.createElement("div");
-      //layer.innerHTML = `<div class="throbbing-icon-success"><h1>Done! Click next to continue.</h1></div>`;
-      //panes.overlayLayer.innerHTML = "";
-      //panes.overlayLayer.appendChild(layer);
-      // }
-    }
-    map.setZoom(newZoom);
-    setMapZoom(newZoom);
-  };
+  const mapClicked = useCallback(
+    (e: any) => {
+      logEvent("click", { target: "Map" });
+      let zoomLevel = map.getZoom() || mapZoom;
+      const zoomThreshold = getZoomThreshold();
+      console.log(zoomLevel);
+      if (
+        isCoordinateInDisabledLocation(
+          {
+            lat: e.latLng.lat(),
+            lng: e.latLng.lng(),
+          },
+          disabledLocations
+        ) &&
+        zoomLevel > zoomThreshold
+      )
+        return;
+      map.panTo({ lat: e.latLng.lat(), lng: e.latLng.lng() });
+      map.setCenter({ lat: e.latLng.lat(), lng: e.latLng.lng() });
+      let newZoom;
+      if (zoomLevel < 7) {
+        // var panes: any = overlayRef.current.getPanes();
+        //panes.overlayLayer.innerHTML = "";
+        newZoom = zoomLevel + 3;
+      }
+      if (zoomLevel > 7) {
+        // var panes: any = overlayRef.current.getPanes();
+        //panes.overlayLayer.innerHTML = "";
+        newZoom = zoomLevel + 2;
+      }
+      if (newZoom > 20) {
+        setSelectedLocationHandler({
+          lat: e.latLng.lat(),
+          lng: e.latLng.lng(),
+          confirmed: false,
+        }); // Ensure we do not exceed zoom level 20
+        // if (overlay && overlayRef.current) {
+        //var panes: any = overlayRef.current.getPanes();
+        //var layer = document.createElement("div");
+        //layer.innerHTML = `<div class="throbbing-icon-success"><h1>Done! Click next to continue.</h1></div>`;
+        //panes.overlayLayer.innerHTML = "";
+        //panes.overlayLayer.appendChild(layer);
+        // }
+      }
+      map.setZoom(newZoom);
+      setMapZoom(newZoom);
+    },
+    [map, showGrid]
+  );
 
   useEffect(() => {
     if (map) {
       const clickListener = map.addListener("click", mapClicked);
+      const keyPressListener = map.addListener("onKeyDown", (e: any) => {
+        console.log(e.key);
+      });
       return () => {
         google.maps.event.removeListener(clickListener);
+        google.maps.event.removeListener(keyPressListener);
       };
     }
   }, [map]);
@@ -303,12 +384,35 @@ const Map = (props: MapProps) => {
     setMap(null);
   }, []);
 
+  const getZoomThreshold = useCallback(() => {
+    let zoomThreshold;
+    switch (precision) {
+      case 2:
+        zoomThreshold = 14;
+        break;
+      case 3:
+        zoomThreshold = 16;
+        break;
+      case 4:
+        zoomThreshold = 18;
+        break;
+      case 5:
+        zoomThreshold = 20;
+        break;
+      case 6:
+        zoomThreshold = 20;
+        break;
+      default:
+        zoomThreshold = 18;
+    }
+    return zoomThreshold;
+  }, [precision]);
+
   // Function to draw the grid, modified to check zoom level
   const drawGridIfZoomedIn = () => {
     if (!map) return;
     const zoomLevel = map.getZoom();
-    const zoomThreshold = 18; // Example threshold, adjust based on needs
-
+    const zoomThreshold = getZoomThreshold();
     map.setMapTypeId(mapTypeId);
     setShowGrid(zoomLevel >= zoomThreshold);
     if (zoomLevel >= zoomThreshold && onZoomWithGrid) {
@@ -404,35 +508,47 @@ const Map = (props: MapProps) => {
           <Polygon paths={paths} options={options} />
         )} */}
           {showGrid &&
-            gridSquares.map((square: any, index: any) => (
-              <Polygon
-                key={index}
-                paths={square.paths}
-                options={{
-                  strokeColor:
-                    selectedSquareIdValue === square.id
-                      ? "lightblue"
-                      : "#000000",
-                  strokeOpacity: 0.6,
-                  strokeWeight: 1,
-                  fillColor:
-                    selectedSquareIdValue === square.id
-                      ? "lightblue"
-                      : "#000000",
-                  zIndex: 100,
-                  clickable: true,
-                  fillOpacity:
-                    selectedSquareIdValue === square.id
-                      ? 0.5
-                      : hoverIndex === index
-                        ? 0.3
-                        : 0.1,
-                }}
-                onMouseOver={() => handleMouseOver(index)}
-                onMouseOut={handleMouseOut}
-                onClick={(e) => handlePolygonClick(square.id, e)}
-              />
-            ))}
+            gridSquares.map((square: any, index: any) => {
+              const isDisabled = isSquareInDisabledLocation(
+                square,
+                disabledLocations
+              );
+              return (
+                <Polygon
+                  key={index}
+                  paths={square.paths}
+                  options={{
+                    strokeColor:
+                      selectedSquareIdValue === square.id
+                        ? "lightgreen"
+                        : isDisabled
+                          ? "red"
+                          : "#000000",
+                    strokeOpacity: 0.8,
+                    strokeWeight: selectedSquareIdValue === square.id ? 5 : 1,
+                    fillColor:
+                      selectedSquareIdValue === square.id
+                        ? "lightgreen"
+                        : isDisabled
+                          ? "red"
+                          : "#000000",
+                    fillOpacity:
+                      selectedSquareIdValue === square.id
+                        ? 0.5
+                        : hoverIndexValue === index
+                          ? 0.3
+                          : 0.1,
+                    clickable: !isDisabled,
+                    zIndex: selectedSquareIdValue === square.id ? 1000 : 100,
+                  }}
+                  onMouseOver={() => handleMouseOver(index)}
+                  onMouseOut={handleMouseOut}
+                  onClick={(e) =>
+                    !isDisabled && handlePolygonClick(square.id, e)
+                  }
+                />
+              );
+            })}
         </GoogleMap>
       )}
     </>

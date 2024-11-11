@@ -54,6 +54,10 @@ Primary.args = {
     height: "100%",
   },
   options: {},
+  precision: 4,
+  disabledLocations: [
+    { lat: 45.52442537936001, lng: -122.68402134845269, radius: 500 },
+  ],
 };
 
 export default {
