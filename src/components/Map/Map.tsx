@@ -1,4 +1,11 @@
-import React, { useEffect, ReactElement, useState, useCallback } from "react";
+import React, {
+  useEffect,
+  ReactElement,
+  useState,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import {
   GoogleMap,
   GoogleMapProps,
@@ -317,9 +324,16 @@ const Map = (props: MapProps) => {
     }
   }, [map, center, precision, showGrid]);
 
+  const disabledLocationsRef = useRef(disabledLocations);
+
+  useEffect(() => {
+    disabledLocationsRef.current = disabledLocations;
+  }, [disabledLocations]);
+
   const mapClicked = useCallback(
     (e: any) => {
       logEvent("click", { target: "Map" });
+      const currentDisabledLocations = disabledLocationsRef.current;
       let zoomLevel = map.getZoom() || mapZoom;
       const zoomThreshold = getZoomThreshold();
       console.log(zoomLevel);
@@ -329,9 +343,9 @@ const Map = (props: MapProps) => {
             lat: e.latLng.lat(),
             lng: e.latLng.lng(),
           },
-          disabledLocations
+          currentDisabledLocations
         ) &&
-        zoomLevel > zoomThreshold
+        zoomLevel >= zoomThreshold
       )
         return;
       map.panTo({ lat: e.latLng.lat(), lng: e.latLng.lng() });
@@ -478,7 +492,6 @@ const Map = (props: MapProps) => {
   const [libraries] = useState([
     "places",
     "geometry",
-    "localContext",
     "drawing",
     "visualization",
   ]);
